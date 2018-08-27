@@ -63,24 +63,18 @@ curl_format = """{
 }"""
 
 https_template = """
-  DNS Lookup   TCP Connection   TLS Handshake   Server Processing   Content Transfer
-[   {a0000}  |     {a0001}    |    {a0002}    |      {a0003}      |      {a0004}     ]
-             |                |               |                   |                  |
-    namelookup:{b0000}        |               |                   |                  |
-                        connect:{b0001}       |                   |                  |
-                                    pretransfer:{b0002}           |                  |
-                                                      starttransfer:{b0003}          |
-                                                                                 total:{b0004}
+
+  DNS_Lookup: '{a0000}',  
+  TCP_Connection: '{a0001}',  
+  TLS_Handshake: '{a0002}', 
+  Server_Processing: '{a0003}', 
+  Content_Transfer: '{a0004}'
+
 """[1:]
 
 http_template = """
   DNS Lookup   TCP Connection   Server Processing   Content Transfer
 [   {a0000}  |     {a0001}    |      {a0003}      |      {a0004}     ]
-             |                |                   |                  |
-    namelookup:{b0000}        |                   |                  |
-                        connect:{b0001}           |                  |
-                                      starttransfer:{b0003}          |
-                                                                 total:{b0004}
 """[1:]
 
 
@@ -249,103 +243,14 @@ def main():
 
     # calculate ranges
     d.update(
-        range_dns=d['time_namelookup'],
-        range_connection=d['time_connect'] - d['time_namelookup'],
-        range_ssl=d['time_pretransfer'] - d['time_connect'],
-        range_server=d['time_starttransfer'] - d['time_pretransfer'],
+        dns_lookup=d['time_namelookup'],
+        tcp_connection=d['time_connect'] - d['time_namelookup'],
+        tls_handshake=d['time_pretransfer'] - d['time_connect'],
+        server_processing=d['time_starttransfer'] - d['time_pretransfer'],
         range_transfer=d['time_total'] - d['time_starttransfer'],
     )
-
-    # ip
-    if show_ip:
-        s = 'Connected to {}:{} from {}:{}'.format(
-            cyan(d['remote_ip']), cyan(d['remote_port']),
-            d['local_ip'], d['local_port'],
-        )
-        print(s)
-        print()
-
-    # print header & body summary
-    with open(headerf.name, 'r') as f:
-        headers = f.read().strip()
-    # remove header file
-    lg.debug('rm header file %s', headerf.name)
-    os.remove(headerf.name)
-
-    for loop, line in enumerate(headers.split('\n')):
-        if loop == 0:
-            p1, p2 = tuple(line.split('/'))
-            print(green(p1) + grayscale[14]('/') + cyan(p2))
-        else:
-            pos = line.find(':')
-            print(grayscale[14](line[:pos + 1]) + cyan(line[pos + 1:]))
-
-    print()
-
-    # body
-    if show_body:
-        body_limit = 1024
-        with open(bodyf.name, 'r') as f:
-            body = f.read().strip()
-        body_len = len(body)
-
-        if body_len > body_limit:
-            print(body[:body_limit] + cyan('...'))
-            print()
-            s = '{} is truncated ({} out of {})'.format(green('Body'), body_limit, body_len)
-            if save_body:
-                s += ', stored in: {}'.format(bodyf.name)
-            print(s)
-        else:
-            print(body)
-    else:
-        if save_body:
-            print('{} stored in: {}'.format(green('Body'), bodyf.name))
-
-    # remove body file
-    if not save_body:
-        lg.debug('rm body file %s', bodyf.name)
-        os.remove(bodyf.name)
-
-    # print stat
-    if url.startswith('https://'):
-        template = https_template
-    else:
-        template = http_template
-
-    # colorize template first line
-    tpl_parts = template.split('\n')
-    tpl_parts[0] = grayscale[16](tpl_parts[0])
-    template = '\n'.join(tpl_parts)
-
-    def fmta(s):
-        return cyan('{:^7}'.format(str(s) + 'ms'))
-
-    def fmtb(s):
-        return cyan('{:<7}'.format(str(s) + 'ms'))
-
-    stat = template.format(
-        # a
-        a0000=fmta(d['range_dns']),
-        a0001=fmta(d['range_connection']),
-        a0002=fmta(d['range_ssl']),
-        a0003=fmta(d['range_server']),
-        a0004=fmta(d['range_transfer']),
-        # b
-        b0000=fmtb(d['time_namelookup']),
-        b0001=fmtb(d['time_connect']),
-        b0002=fmtb(d['time_pretransfer']),
-        b0003=fmtb(d['time_starttransfer']),
-        b0004=fmtb(d['time_total']),
-    )
-    print()
-    print(stat)
-
-    # speed, originally bytes per second
-    if show_speed:
-        print('speed_download: {:.1f} KiB/s, speed_upload: {:.1f} KiB/s'.format(
-            d['speed_download'] / 1024, d['speed_upload'] / 1024))
+    return json.dumps(d)
 
 
 if __name__ == '__main__':
-    main()
+    print(main())
